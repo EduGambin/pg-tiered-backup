@@ -1,0 +1,20 @@
+# Un archivo docker-compose.yml es una receta para describirle a Docker qué
+# servicios necesitamos y cómo configurarlos.
+
+services: # Aplicaciones independientes que se van a lanzar.
+  postgres:
+    image: postgres:18 # Imagen oficial ya preparada que se descarga.
+    environment: # Variables de entorno.
+      POSTGRES_PASSWORD: mi_contraseña_segura
+    ports: # "puerto_mi_pc:puerto_contenedor".
+      - "5432:5432"
+  
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001" # Instrucciones de arranque.
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: mi_contraseña_segura
+    ports:
+      - "9000:9000"
+      - "9001:9001"
