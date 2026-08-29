@@ -62,8 +62,14 @@ def run_verify():
     s3 = get_s3_client()
     bucket_name = "backups"
 
-    response = s3.list_objects_v2(Bucket=bucket_name)
-    objects = response.get("Contents", [])
+    # TODO: En vez de descargar todos los objetos, se puede solicitar aquel
+    # que tenga el nombre más reciente (dado que todos los backups se llaman)
+    # backup_{timestamp}.dump. Esta mejora proporciona O(1) en búsqueda.
+    paginator = s3.get_paginator("list_objects_v2")
+    objects = []
+    for page in paginator.paginate(Bucket=bucket_name):
+        objects.extend(page.get("Contents", []))
+
     if not objects:
         raise Exception("Bucket does not contain verification objects.")
     newest = max(objects, key=lambda x: x["LastModified"])
