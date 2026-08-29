@@ -83,50 +83,75 @@ def run_verify():
     cmd = ["psql", "-h", "localhost", "-p", "5432", "-U", "postgres", "-d", "postgres"]
 
     print("Preparing the 'verify_scratch' database...")
+    # Aunque en el finally haya la misma llamada, hay que mantener esta porque
+    # si se mata al proceso, no se ejecuta el finally, así que mejor dejarlo.
     subprocess.run(
-        cmd + ["-c", "DROP DATABASE IF EXISTS verify_scratch;"], env=env, check=True
+        cmd + ["-c", "DROP DATABASE IF EXISTS verify_scratch WITH (FORCE);"], env=env, check=False
     )
     subprocess.run(cmd + ["-c", "CREATE DATABASE verify_scratch;"], env=env, check=True)
 
-    print("Restoring data with pg_restore...")
-    subprocess.run(
-        [
-            "pg_restore",
-            "-h",
-            "localhost",
-            "-p",
-            "5432",
-            "-U",
-            "postgres",
-            "-d",
-            "verify_scratch",
-            local_file,
-        ],
-        env=env,
-        check=True,
-    )
-
-    tables = [
-        "pgbench_accounts",
-        "pgbench_branches",
-        "pgbench_history",
-        "pgbench_tellers",
-    ]
-    print("\nVerification results:")
-    print("-----------------------\n")
-    for table in tables:
-        table_cmd = cmd[0:-2] + [
-            "-d",
-            "verify_scratch",
-            "-t",
-            "-A",
-            "-c",
-            f"SELECT count(*) FROM {table};",
-        ]
-        result = subprocess.run(
-            table_cmd, env=env, check=True, capture_output=True, text=True
+    try:
+        print("Restoring data with pg_restore...")
+        subprocess.run(
+            [
+                "pg_restore",
+                "-h",
+                "localhost",
+                "-p",
+                "5432",
+                "-U",
+                "postgres",
+                "-d",
+                "verify_scratch",
+                local_file,
+            ],
+            env=env,
+            check=True,
         )
-        print(f"{table}: {result.stdout.strip()}")
+        # TODO: en el paso 4 esto sasaldrá del manifest.
+        expected = {
+            "pgbench_accounts": 2000000,
+            "pgbench_branches": 20,
+            "pgbench_history": 0,
+            "pgbench_tellers": 200,
+        }
+
+        print("\nVerification results:")
+        print("-----------------------\n")
+        mismatches = []
+        for table, want in expected.items():
+            table_cmd = cmd[0:-2] + [
+                "-d",
+                "verify_scratch",
+                "-t",
+                "-A",
+                "-c",
+                f"SELECT count(*) FROM {table};",
+            ]
+            result = subprocess.run(
+                table_cmd, env=env, check=True, capture_output=True, text=True
+            )
+            got = int(result.stdout.strip())
+            print(
+                f"{table}: {got} (expected {want}) {'OK' if got == want else 'MISMATCH'}"
+            )
+            if got != want:
+                mismatches.append(table)
+
+        if mismatches:
+            raise SystemExit(
+                f"verify failed, row counts differ: {', '.join(mismatches)}"
+            )
+
+    finally:
+        print("Dropping scratch database...")
+        # Necesitamos check=False para que no salte una excepción dentro del finally.
+        # Lo de WITH (FORCE) es para que no falle aunque hayan cosas abiertas aún.
+        subprocess.run(
+            cmd + ["-c", "DROP DATABASE IF EXISTS verify_scratch WITH (FORCE);"],
+            env=env,
+            check=False,
+        )
 
 
 def main():
