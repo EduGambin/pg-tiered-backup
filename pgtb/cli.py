@@ -1,5 +1,9 @@
-from tabnanny import check
-from types_boto3_s3 import S3Client
+# No hace falta cargar esta librería en producción, tan solo al desarrollar.
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types_boto3_s3 import S3Client
+
 import argparse
 import datetime
 import os
@@ -7,7 +11,7 @@ import subprocess
 import boto3  # Boto3 es la librería oficial de AWS para Python.
 
 
-def get_s3_client() -> S3Client:
+def get_s3_client() -> "S3Client":
     # Estos dos valores se leen desde el .env para evitar literales
     aws_id = os.environ.get("AWS_ACCESS_KEY_ID")
     aws_secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
