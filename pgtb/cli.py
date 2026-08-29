@@ -94,6 +94,7 @@ def run_verify():
             "postgres",
             "-d",
             "verify_scratch",
+            local_file,
         ],
         env=env,
         check=True,
